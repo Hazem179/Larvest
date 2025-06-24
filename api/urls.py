@@ -22,4 +22,5 @@ urlpatterns = [
     path('tile-map/', views.TileMapView.as_view(), name='tile-map'),
     path('farm-areas/', views.FarmAreaView.as_view(), name='farm-area-list'),
     path('farm-areas/<int:pk>/', views.FarmAreaDetailView.as_view(), name='farm-area-detail'),
+    path('time_series/', views.TimeSeriesView.as_view(), name='time_series'),
 ]

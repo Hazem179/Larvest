@@ -11,7 +11,7 @@ from drf_spectacular.utils import extend_schema
 from account.models import Profile,Account
 from account.serializers import ProfileSerializer,RegisterSerializer,LandSerializer
 from .utils import generate_tiles_and_map
-from .schemas import register_schema,land_schema, tile_generation_schema, TileGenerationSerializer
+from .schemas import register_schema,land_schema, tile_generation_schema, TileGenerationSerializer, time_series_schema, TimeSeriesSerializer
 from .models import Land, FarmArea
 from .serializers import FarmAreaSerializer
 from django.shortcuts import get_object_or_404 # For fetching objects or 404
@@ -19,6 +19,8 @@ from rest_framework import viewsets # Add viewsets import
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+import glob
+import uuid
 
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
@@ -400,4 +402,82 @@ class FarmAreaDetailView(APIView):
         farm_area = self.get_object(pk)
         farm_area.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class TimeSeriesView(APIView):
+    """
+    Compute time series using VirtuGhan Python package directly and return GIF and values file.
+    """
+    @time_series_schema
+    def post(self, request):
+        serializer = TimeSeriesSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            from vcube.engine import VCubeProcessor
+            import mercantile
+            payload = serializer.validated_data
+            # Create a unique output directory for this request
+            unique_id = str(uuid.uuid4())
+            base_output_dir = os.path.abspath("virtughan_output")
+            output_dir = os.path.join(base_output_dir, unique_id)
+            os.makedirs(output_dir, exist_ok=True)
+            processor = VCubeProcessor(
+                bbox=[payload["min_lon"], payload["min_lat"], payload["max_lon"], payload["max_lat"]],
+                start_date=payload["start_date"],
+                end_date=payload["end_date"],
+                cloud_cover=payload["cloud_cover"],
+                formula=payload["formula"],
+                band1=payload["band1"],
+                band2=payload["band2"],
+                operation=payload["operation"],
+                timeseries=payload["timeseries"],
+                output_dir=output_dir,
+                workers=payload["workers"]
+            )
+            result = processor.compute()
+            # Find GIF and values file
+            gif_file = None
+            values_file = None
+            for f in os.listdir(output_dir):
+                if f.endswith('.gif'):
+                    gif_file = os.path.abspath(os.path.join(output_dir, f))
+                elif f.startswith('values_over_time'):
+                    values_file = os.path.abspath(os.path.join(output_dir, f))
+            # Delete all other files in output_dir
+            for f in os.listdir(output_dir):
+                full_path = os.path.abspath(os.path.join(output_dir, f))
+                if full_path != gif_file and full_path != values_file:
+                    os.remove(full_path)
+            if not gif_file or not values_file:
+                return Response({"error": "Required output files not found."}, status=status.HTTP_400_BAD_REQUEST)
+            # Return full file paths
+            return Response(
+                {
+                    "message": "Time series computation completed successfully!",
+                    "gif_file_path": gif_file,
+                    "values_file_path": values_file,
+                    "output_dir": output_dir,
+                    "request_id": unique_id
+                },
+                status=status.HTTP_200_OK
+            )
+        except ImportError:
+            return Response(
+                {
+                    "error": "VirtuGhan package not installed. Install with: pip install VirtuGhan",
+                    "detail": "The VirtuGhan package is required for this endpoint to work."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "error": f"VirtuGhan computation failed: {str(e)}",
+                    "detail": "An error occurred during the time series computation."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
