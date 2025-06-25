@@ -421,7 +421,7 @@ class TimeSeriesView(APIView):
             payload = serializer.validated_data
             # Create a unique output directory for this request
             unique_id = str(uuid.uuid4())
-            base_output_dir = os.path.abspath("virtughan_output")
+            base_output_dir = os.path.abspath("media/virtughan_output")
             output_dir = os.path.join(base_output_dir, unique_id)
             os.makedirs(output_dir, exist_ok=True)
             processor = VCubeProcessor(
