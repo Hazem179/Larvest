@@ -15,7 +15,24 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = '__all__'
-        
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', None)
+        if user_data:
+            user = instance.user
+            for attr in ['first_name', 'last_name', 'username', 'email']:
+                if attr in user_data:
+                    setattr(user, attr, user_data[attr])
+            user.save()
+        # Update other profile fields if needed
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        # Explicitly allow updating birth_date
+        if 'birth_date' in validated_data:
+            instance.birth_date = validated_data['birth_date']
+        instance.save()
+        return instance
+
 class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account

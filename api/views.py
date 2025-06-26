@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from account.models import Profile,Account
 from account.serializers import ProfileSerializer,RegisterSerializer,LandSerializer
 from .utils import generate_tiles_and_map
@@ -40,6 +40,42 @@ class ProfileView(APIView):
             profiles = Profile.objects.all()
             serializer = ProfileSerializer(profiles, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        request=ProfileSerializer,
+        examples=[
+            OpenApiExample(
+                'Update Profile Example',
+                value={
+                    "user": {
+                        "first_name": "John",
+                        "last_name": "Doe",
+                        "username": "johndoe123",
+                        "email": "john.doe@example.com"
+                    },
+                    "birth_date": "1990-01-01"
+                },
+                request_only=True,
+                response_only=False,
+            )
+        ]
+    )
+    def put(self, request, user_id=None):
+        if user_id:
+            try:
+                profile = Profile.objects.get(user__id=user_id)
+            except Profile.DoesNotExist:
+                return Response({"detail": "Profile not found."}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            try:
+                profile = Profile.objects.get(user=request.user)
+            except Profile.DoesNotExist:
+                return Response({"detail": "Profile not found for current user."}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ProfileSerializer(profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LogOutAPIView(APIView):
