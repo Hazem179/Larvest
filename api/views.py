@@ -441,11 +441,15 @@ class TimeSeriesView(APIView):
             # Find GIF and values file
             gif_file = None
             values_file = None
+            gif_filename = None
+            values_filename = None
             for f in os.listdir(output_dir):
                 if f.endswith('.gif'):
                     gif_file = os.path.abspath(os.path.join(output_dir, f))
+                    gif_filename = f
                 elif f.startswith('values_over_time'):
                     values_file = os.path.abspath(os.path.join(output_dir, f))
+                    values_filename = f
             # Delete all other files in output_dir
             for f in os.listdir(output_dir):
                 full_path = os.path.abspath(os.path.join(output_dir, f))
@@ -453,13 +457,15 @@ class TimeSeriesView(APIView):
                     os.remove(full_path)
             if not gif_file or not values_file:
                 return Response({"error": "Required output files not found."}, status=status.HTTP_400_BAD_REQUEST)
-            # Return full file paths
+            # Return media paths instead of full paths
+            gif_media_path = f"media/virtughan_output/{unique_id}/{gif_filename}"
+            values_media_path = f"media/virtughan_output/{unique_id}/{values_filename}"
             return Response(
                 {
                     "message": "Time series computation completed successfully!",
-                    "gif_file_path": gif_file,
-                    "values_file_path": values_file,
-                    "output_dir": output_dir,
+                    "gif_file_path": gif_media_path,
+                    "values_file_path": values_media_path,
+                    "output_dir": f"media/virtughan_output/{unique_id}",
                     "request_id": unique_id
                 },
                 status=status.HTTP_200_OK

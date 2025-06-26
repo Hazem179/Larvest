@@ -61,12 +61,15 @@ async def generate_tiles_and_map(
             file_path = os.path.join(tiles_dir, filename)
             image.save(file_path)
             
+            # Create relative path from media directory
+            relative_path = os.path.join("media/tiles", filename)
+            
             print(f"Saved image to: {file_path}")
             results.append({
                 'tile': f"{x}_{y}_{z}",
                 'date': feature['properties']['datetime'],
                 'cloud_cover': feature['properties']['eo:cloud_cover'],
-                'file_path': file_path,
+                'file_path': relative_path,
                 'x': x,
                 'y': y,
                 'z': z
@@ -85,7 +88,8 @@ async def generate_tiles_and_map(
             tile = mercantile.Tile(x=x, y=y, z=z)
             bounds = mercantile.bounds(tile)
             folium_bounds = [[bounds.south, bounds.west], [bounds.north, bounds.east]]
-            image_path = result['file_path']
+            # Use full path for folium but relative path in results
+            image_path = os.path.join(media_dir, result['file_path'])
             if os.path.exists(image_path):
                 folium.raster_layers.ImageOverlay(
                     image=image_path,
